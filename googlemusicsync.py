@@ -164,19 +164,21 @@ class GoogleClient():
                     ': %s' % cred_path)
         self.Api = Mobileclient()
         if not self.Api.login(username, password)
-            raise Exception('login failed for %s' % username)
+           raise Exception('login failed for %s' % username)
         
         return True
 
 # Handles a comparison between your local files and google
 class ComparisonManager():
-    def __init__(self, local_path, user=None, password=None):
+    def __init__(self, local_path, username=None, password=None):
         self._root = local_path
+        self._username = username
+        self._password = password
 
     # Perform a comparison between your local files and google
     def do_comparison(self):
         # Create a connection to google
-        self._gc = GoogleClient(user, password)
+        self._gc = GoogleClient(self._username, self._password)
         if self._gc.Authenticate() is True:
             self._load_differences()
 
