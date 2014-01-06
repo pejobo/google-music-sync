@@ -20,10 +20,10 @@ The script accepts parameters:
 ./googlemusicsync.py -p LOCAL_PATH -s 'true/false' -u username -l login
 
 Where
--p is the local path that you wish to scan
--s should the changes be synced, or just report the differences
--u username, e.g. foo@mail.com
--l password (this is currently needed for getting the list of songs from google)
+- p is the local path that you wish to scan
+- s should the changes be synced, or just report the differences
+- u username, e.g. foo@mail.com
+- l password (this is currently needed for getting the list of songs from google)
 
 Last to params could also be read from the same file as gmusicfs (<userhome>/.gmusicfs).
 For upload the OAuth functionality of gmusicapi is utilized.
