@@ -26,7 +26,7 @@ class TrackCollection(object):
         return self.tracks[key]
 
     # Adds a track to the collection
-    def add_track(self, track, title, album, artist, info):
+    def add_track(self, info, track=0, title='', album='', artist=''):
         re_track_no = re.compile('.+\s+')
 
         # create dictionary key
@@ -91,7 +91,7 @@ class LocalTrackCollection(TrackCollection):
                 if self._is_valid_file_name(name):
                     fullpath = os.path.join(path, name)
                     local_track = eyed3.load(fullpath)
-                    self.add_track(local_track.tag.track_num, local_track.tag.title, local_track.tag.album, local_track.tag.artist, fullpath)
+                    self.add_track(fullpath, local_track.tag.track_num, local_track.tag.title, local_track.tag.album, local_track.tag.artist)
         print("Loaded {0} tracks from Local Library".format(len(self.tracks)))
     
     # Checks the file name is an mp3
@@ -111,14 +111,13 @@ class GoogleTrackCollection(TrackCollection):
     def load_tracks(self):
         print("Loading GoogleMusic library...")
         for gm_track in self._gc.Api.get_all_songs():
-            self.add_track(gm_track['track_number'], gm_track['title'], gm_track['album'], gm_track['artist'], gm_track)
+            self.add_track(gm_track, gm_track.get('trackNumber'), gm_track.get('title'), gm_track.get('album'), gm_track.get('artist'))
 
         print("Loaded {0} tracks from GoogleMusic".format(len(self.tracks)))
     
 # Handles a connection to Google
 class GoogleClient():
     def __init__(self, username=None, password=None):
-        self._root = local_path
         self._username = username
         self._password = password
 
@@ -140,8 +139,8 @@ class GoogleClient():
 
         print "OAuth successfull\n"
 
-				username = self._username
-				password = self._password
+        username = self._username
+        password = self._password
         if not username or not password:
             cred_path = os.path.join(os.path.expanduser('~'), '.gmusicfs')
             if not os.path.isfile(cred_path):
@@ -163,7 +162,7 @@ class GoogleClient():
                     'No username/password could be read from config file'
                     ': %s' % cred_path)
         self.Api = Mobileclient()
-        if not self.Api.login(username, password)
+        if not self.Api.login(username, password):
            raise Exception('login failed for %s' % username)
         
         return True
