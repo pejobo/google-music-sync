@@ -4,7 +4,9 @@ import sys
 import os
 import eyed3
 import argparse
+import ConfigParser
 from gmusicapi import Musicmanager
+from gmusicapi import Mobileclient
 
 # Used to hold a collection of Tracks
 class TrackCollection(object):
@@ -108,13 +110,18 @@ class GoogleTrackCollection(TrackCollection):
     # Loads the local tracks from the file system
     def load_tracks(self):
         print("Loading GoogleMusic library...")
-        for gm_track in self._gc.MusicManager.get_all_songs():
+        for gm_track in self._gc.Api.get_all_songs():
             self.add_track(gm_track['track_number'], gm_track['title'], gm_track['album'], gm_track['artist'], gm_track)
 
         print("Loaded {0} tracks from GoogleMusic".format(len(self.tracks)))
     
 # Handles a connection to Google
 class GoogleClient():
+    def __init__(self, username=None, password=None):
+        self._root = local_path
+        self._username = username
+        self._password = password
+
     # Initiates the oAuth
     def Authenticate(self):
         self.MusicManager = Musicmanager(debug_logging=False)
@@ -131,18 +138,45 @@ class GoogleClient():
                 print "Sorry, login failed."
                 return False
 
-        print "Successfully logged in.\n"
+        print "OAuth successfull\n"
+
+				username = self._username
+				password = self._password
+        if not username or not password:
+            cred_path = os.path.join(os.path.expanduser('~'), '.gmusicfs')
+            if not os.path.isfile(cred_path):
+                raise Exception(
+                    'No username/password was specified. No config file could '
+                    'be found either. Try creating %s and specifying your '
+                    'username/password there. Make sure to chmod 600.'
+                    % cred_path)
+            if not oct(os.stat(cred_path)[os.path.stat.ST_MODE]).endswith('00'):
+                raise Exception(
+                    'Config file is not protected. Please run: '
+                    'chmod 600 %s' % cred_path)
+            self.config = ConfigParser.ConfigParser()
+            self.config.read(cred_path)
+            username = self.config.get('credentials','username')
+            password = self.config.get('credentials','password')
+            if not username or not password:
+                raise Exception(
+                    'No username/password could be read from config file'
+                    ': %s' % cred_path)
+        self.Api = Mobileclient()
+        if not self.Api.login(username, password)
+            raise Exception('login failed for %s' % username)
+        
         return True
 
 # Handles a comparison between your local files and google
 class ComparisonManager():
-    def __init__(self, local_path):
+    def __init__(self, local_path, user=None, password=None):
         self._root = local_path
 
     # Perform a comparison between your local files and google
     def do_comparison(self):
         # Create a connection to google
-        self._gc = GoogleClient()
+        self._gc = GoogleClient(user, password)
         if self._gc.Authenticate() is True:
             self._load_differences()
 
@@ -199,6 +233,12 @@ def main():
                         default="false",
                         choices=['true','false'],
                         help="Sync your local files to google music")
+
+    parser.add_argument("-u", "--user", dest="user",
+                        help="User name for login (e.g. bla@gmail.com) - if not set will be read from ~/.gmusicfs")
+
+    parser.add_argument("-l", "--login", dest="password",
+                        help="Password for login, use application specific password if you use 2-factor auth - if not set will be read from ~/.gmusicfs")
 
     args = parser.parse_args()
 
