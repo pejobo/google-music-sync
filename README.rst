@@ -18,7 +18,7 @@ And finally make it executable:
 -  sudo chmod 0755 googlemusicsync.py
 
 The script accepts parameters:
-./googlemusicsync.py -p LOCAL_PATH -s 'true/false' -u username -l login
+./googlemusicsync.py -p LOCAL_PATH -s -u username -l login
 
 Where
 
