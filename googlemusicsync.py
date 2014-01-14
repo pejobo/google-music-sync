@@ -2,11 +2,14 @@
 import re
 import sys
 import os
+import time
 import eyed3
 import argparse
 import ConfigParser
 from gmusicapi import Musicmanager
 from gmusicapi import Mobileclient
+
+import code
 
 # Used to hold a collection of Tracks
 class TrackCollection(object):
@@ -86,12 +89,18 @@ class LocalTrackCollection(TrackCollection):
     # Loads the local tracks from the file system
     def load_tracks(self):
         print("Loading Local Library...")
-        for path, subdirs, files in os.walk(self._root):
+        for path, subdirs, files in os.walk(self._root.decode('unicode-escape')):
             for name in files:
                 if self._is_valid_file_name(name):
                     fullpath = os.path.join(path, name)
-                    local_track = eyed3.load(fullpath)
-                    self.add_track(fullpath, local_track.tag.track_num, local_track.tag.title, local_track.tag.album, local_track.tag.artist)
+                    try:
+                       local_track = eyed3.load(fullpath)
+                       if local_track.tag is None:
+                           print "ignoring ", fullpath
+                       else:
+                           self.add_track(fullpath, local_track.tag.track_num, local_track.tag.title, local_track.tag.album, local_track.tag.artist)
+                    except IOError as err:
+                       print "failure reading ", fullpath, ": ", err
         print("Loaded {0} tracks from Local Library".format(len(self.tracks)))
     
     # Checks the file name is an mp3
@@ -161,10 +170,10 @@ class GoogleClient():
                 raise Exception(
                     'No username/password could be read from config file'
                     ': %s' % cred_path)
-        self.Api = Mobileclient()
+        self.Api = Mobileclient(debug_logging = False)
         if not self.Api.login(username, password):
            raise Exception('login failed for %s' % username)
-        
+
         return True
 
 # Handles a comparison between your local files and google
@@ -181,11 +190,26 @@ class ComparisonManager():
         if self._gc.Authenticate() is True:
             self._load_differences()
 
-    # Loads the differences between the two collections
-    def _load_differences(self):
+    # Load local tracks
+    def _load_local_tracks(self):
         # Get the local tracks
         self._local_tracks = LocalTrackCollection(self._root)
         self._local_tracks.load_tracks()
+
+    # Force upload of all local tracks
+    def force_upload(self):
+       # Create a connection to google
+       self._gc = GoogleClient(self._username, self._password)
+       if self._gc.Authenticate():
+           self._load_local_tracks();
+           self._files_not_on_google = []
+           for track in self._local_tracks.tracks:
+               self._files_not_on_google.append(track)
+           print "forced upload of ", len(self._files_not_on_google), " local tracks"
+
+    # Loads the differences between the two collections
+    def _load_differences(self):
+        self._load_local_tracks();
         
         # Get the google tracks
         self._google_tracks = GoogleTrackCollection(self._gc)
@@ -198,7 +222,7 @@ class ComparisonManager():
             if not self._google_tracks.has_track(track):
                 self._files_not_on_google.append(track)
 
-        print("{0} differences found.".format(len(self._files_not_on_google)))
+        print("{0} new songs found".format(len(self._files_not_on_google)))
         self._files_not_on_google.sort()
 
     # upload the files that are on your computer, but aren't on google music
@@ -209,20 +233,26 @@ class ComparisonManager():
         else:
             filenum = 0
             total = len(self._files_not_on_google)
+            print "start uploading new songs..."
             for file in self._files_not_on_google:
                 filenum += 1
                 file_path = self._local_tracks.get_track(file)
-                uploaded, matched, not_uploaded = self._gc.MusicManager.upload(file_path, transcode_quality="320k", enable_matching=False)
+                start = time.time()
+                uploaded, matched, not_uploaded = self._gc.MusicManager.upload(file_path, transcode_quality="320k", enable_matching=True)
+                duration = time.time() - start
                 if uploaded:
-                        print "(%s/%s) " % (filenum, total), "Successfully uploaded ", file_path
+                        print "(%s/%s) " % (filenum, total), "Successfully uploaded ", file_path, " (time=", duration, "s)"
                 elif matched:
-                        print "(%s/%s) " % (filenum, total), "Successfully scanned and matched ", file_path
+                        print "(%s/%s) " % (filenum, total), "Successfully scanned and matched ", file_path, " (time=", duration, "s)"
                 else:
-                        if "ALREADY_EXISTS" or "this song is already uploaded" in not_uploaded[file_path]:
-                                response = "ALREADY EXISTS"
-                        else:
-                                response = not_uploaded[file_path]
+                        #if "ALREADY_EXISTS" or "this song is already uploaded" in not_uploaded[file_path]:
+                        #        response = "ALREADY EXISTS"
+                        #else:
+                        #        response = not_uploaded[file_path]
+                        response = not_uploaded[file_path]
                         print "(%s/%s) " % (filenum, total), "Failed to upload ", file_path, " | ", response
+                        if response == '':
+                            raise Exception('assuming interrupt - todo: file gmusicapi bug for this')
 
 def main():
     # Get the arguements
@@ -230,9 +260,7 @@ def main():
     parser.add_argument("-p", "--path", dest="local_path", required=True,
                         help="The local directory to scan")
 
-    parser.add_argument("-s", "--sync", dest="should_sync",
-                        default="false",
-                        choices=['true','false'],
+    parser.add_argument("-s", "--sync", action="store_true",
                         help="Sync your local files to google music")
 
     parser.add_argument("-u", "--user", dest="user",
@@ -241,11 +269,19 @@ def main():
     parser.add_argument("-l", "--login", dest="password",
                         help="Password for login, use application specific password if you use 2-factor auth - if not set will be read from ~/.gmusicfs")
 
+    parser.add_argument("-F", "--force-upload", action="store_true",
+                        help="Force upload (no reading of already uploaded files")
+
     args = parser.parse_args()
 
     comparison_manager = ComparisonManager(args.local_path)
-    comparison_manager.do_comparison()
-    if args.should_sync == "true":
+
+    if args.force_upload:
+        comparison_manager.force_upload()
+    else:
+        comparison_manager.do_comparison()
+
+    if args.sync:
         comparison_manager.do_upload()
 
 if __name__ == '__main__':
