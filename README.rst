@@ -1,6 +1,6 @@
 GoogleMusicSync: 
 ==================================================
-A simple Python script to sync your local MP3 library to Google Play Music.
+A simple Python2 script to sync your local MP3 library to Google Play Music.
 Uses the excellent Google Music API script by Simon Weber and eyeD3 for MP3 tag reading.
 
 To run it, you'll need the pre-reqs:
@@ -9,7 +9,7 @@ To run it, you'll need the pre-reqs:
 -  pip install eyeD3
 -  apt-get install avconf (for match & scan)
 
-(Tested against gmusicapi 3.1.0-dev and eyeD3 0.7.4)
+(Tested against gmusicapi 7.0.0 and eyeD3 0.7.8)
   
 Then download googlemusicsync.py (e.g. wget with raw file link)
 
@@ -25,11 +25,17 @@ Where
 -  p is the local path that you wish to scan
 -  s sync the changes (if omitted no sync is performed)
 -  f force-upload (do not check against titles already uploaded)
--  u username, e.g. foo@mail.com
--  l login-password (this is currently needed for getting the list of songs from google)
+-  u username, e.g. foo@gmail.com
+-  l login-password (this is needed for getting the list of songs from google, use a app-specific password if you use 2-Factor auth for google)
 
+Last two params could also be read from the same file as gmusicfs (~/.gmusicfs):
 
-Last two params could also be read from the same file as gmusicfs (<userhome>/.gmusicfs).
+```
+[credentials]
+username=xx@gmail.com
+password=xyz
+```
+
 For upload the OAuth functionality of gmusicapi is utilized.
 
 Please note at the moment that this script is simply one way, any files that 
