@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2.7
 import re
 import sys
 import os
@@ -6,6 +6,8 @@ import time
 import eyed3
 import argparse
 import ConfigParser
+import pkg_resources
+# pkg_resources.require("gmusicapi==7.0.0")
 from gmusicapi import Musicmanager
 from gmusicapi import Mobileclient
 
@@ -94,13 +96,13 @@ class LocalTrackCollection(TrackCollection):
                 if self._is_valid_file_name(name):
                     fullpath = os.path.join(path, name)
                     try:
-                       local_track = eyed3.load(fullpath)
+                       local_track = eyed3.load(fullpath.decode('UTF-8'))
                        if local_track.tag is None:
-                           print "ignoring ", fullpath
-                       else:
-                           self.add_track(fullpath, local_track.tag.track_num, local_track.tag.title, local_track.tag.album, local_track.tag.artist)
+                          local_track.tag = eyed3.id3.Tag()
+                          local_track.tag.file_info = eyed3.id3.FileInfo(fullpath) 
+                       self.add_track(fullpath, local_track.tag.track_num, local_track.tag.title, local_track.tag.album, local_track.tag.artist)
                     except IOError as err:
-                       print "failure reading ", fullpath, ": ", err
+                       print("failure reading ", fullpath, ": ", err)
         print("Loaded {0} tracks from Local Library".format(len(self.tracks)))
     
     # Checks the file name is an mp3
@@ -116,7 +118,7 @@ class GoogleTrackCollection(TrackCollection):
             gc.Authenticate()
         self._gc = gc
 
-    # Loads the local tracks from the file system
+    # Loads the tracks from google 
     def load_tracks(self):
         print("Loading GoogleMusic library...")
         for gm_track in self._gc.Api.get_all_songs():
@@ -143,10 +145,10 @@ class GoogleClient():
                 attempts += 1
 
         if not self.MusicManager.is_authenticated():
-                print "Sorry, login failed."
+                print("Sorry, login failed.")
                 return False
 
-        print "OAuth successfull\n"
+        print("OAuth successfull\n")
 
         username = self._username
         password = self._password
@@ -171,7 +173,7 @@ class GoogleClient():
                     'No username/password could be read from config file'
                     ': %s' % cred_path)
         self.Api = Mobileclient(debug_logging = False)
-        if not self.Api.login(username, password):
+        if not self.Api.login(username, password, Mobileclient.FROM_MAC_ADDRESS):
            raise Exception('login failed for %s' % username)
 
         return True
@@ -205,7 +207,7 @@ class ComparisonManager():
            self._files_not_on_google = []
            for track in self._local_tracks.tracks:
                self._files_not_on_google.append(track)
-           print "forced upload of ", len(self._files_not_on_google), " local tracks"
+           print("forced upload of ", len(self._files_not_on_google), " local tracks")
 
     # Loads the differences between the two collections
     def _load_differences(self):
@@ -233,7 +235,7 @@ class ComparisonManager():
         else:
             filenum = 0
             total = len(self._files_not_on_google)
-            print "start uploading new songs..."
+            print("start uploading new songs...")
             for file in self._files_not_on_google:
                 filenum += 1
                 file_path = self._local_tracks.get_track(file)
@@ -241,16 +243,16 @@ class ComparisonManager():
                 uploaded, matched, not_uploaded = self._gc.MusicManager.upload(file_path, transcode_quality="320k", enable_matching=True)
                 duration = time.time() - start
                 if uploaded:
-                        print "(%s/%s) " % (filenum, total), "Successfully uploaded ", file_path, " (time=", duration, "s)"
+                        print("(%s/%s) " % (filenum, total), "Successfully uploaded ", file_path, " (time=", duration, "s)")
                 elif matched:
-                        print "(%s/%s) " % (filenum, total), "Successfully scanned and matched ", file_path, " (time=", duration, "s)"
+                        print("(%s/%s) " % (filenum, total), "Successfully scanned and matched ", file_path, " (time=", duration, "s)")
                 else:
                         #if "ALREADY_EXISTS" or "this song is already uploaded" in not_uploaded[file_path]:
                         #        response = "ALREADY EXISTS"
                         #else:
                         #        response = not_uploaded[file_path]
                         response = not_uploaded[file_path]
-                        print "(%s/%s) " % (filenum, total), "Failed to upload ", file_path, " | ", response
+                        print("(%s/%s) " % (filenum, total), "Failed to upload ", file_path, " | ", response)
                         if response == '':
                             raise Exception('assuming interrupt - todo: file gmusicapi bug for this')
 
@@ -274,7 +276,7 @@ def main():
 
     args = parser.parse_args()
 
-    comparison_manager = ComparisonManager(args.local_path)
+    comparison_manager = ComparisonManager(args.local_path, args.user, args.password)
 
     if args.force_upload:
         comparison_manager.force_upload()
